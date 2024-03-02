@@ -7,3 +7,8 @@ module.exports = joi.object().keys({
     email: joi.string().email().required(),
     password: joi.string().min(8).max(15).required()
 });
+
+/**
+  $Env:Secret_Key= 'mySecretKey'
+$env:NODE_ENV = "test" ; node index.js
+ */
