@@ -7,7 +7,15 @@ const userSchema = new mongoose.Schema({
     lastName: String,
     phoneNum: String,
     email: String,
-    password: String
+    password: String,
+    otp: {
+        type: String,
+        required:true
+    },
+    isActivated: {
+        type: Boolean,
+        default:false
+    }
 });
 
 userSchema.methods.generateAuthToken = function () {

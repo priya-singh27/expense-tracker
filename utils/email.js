@@ -1,4 +1,8 @@
+require('dotenv').config();
 const nodemailer = require('nodemailer');
+const userEmail = process.env.USER;
+const pass = process.env.PASS;
+
 
 function generateOtp() {
     const digits = '0123456789';
@@ -9,18 +13,18 @@ function generateOtp() {
 
     return OTP;
 }
-const OTP=generateOtp()
+// const OTP = generateOtp();
 
 
-async function sendEmail(email) {
+async function sendEmail(email,otp) {
     try {
         // const otp = OTP;
         const transporter = nodemailer.createTransport({
             name:"nodemailer",
             service: 'gmail',
             auth: {
-                user:"priyasingh86906@gmail.com",
-                pass:'hhry tmbk tknz nnfr'
+                user:userEmail,
+                pass:pass
             },
             port: 3000,
             host:'smtp.gmail.com'
@@ -30,7 +34,7 @@ async function sendEmail(email) {
             from: "priyasingh86906@gmail.com",
             to: email,
             subject: 'Your One-Time Passsword (OTP)',
-            text:`Your OTP id: ${OTP}`
+            text:`Your OTP id: ${otp}`
         };
 
         await transporter.sendMail(mailOptions, (err, info) => {
@@ -40,7 +44,6 @@ async function sendEmail(email) {
                 console.log('Email sent successfully!', info.response);
             }
         });
-        return OTP;
         
     }
     catch (err) {
@@ -63,6 +66,7 @@ const verifyOTP = async (email,enteredOtp) => {
         console.log(enteredOtp);
         console.log(OTP);
         if (enteredOtp === OTP) {
+
             return true;
         } else {
             return false;
@@ -95,6 +99,7 @@ const verifyOTP = async (email,enteredOtp) => {
 // };
 
 module.exports = {
+    generateOtp,
     sendEmail,
     verifyOTP
 }
