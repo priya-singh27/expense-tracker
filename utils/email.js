@@ -36,14 +36,17 @@ async function sendEmail(email,otp) {
             subject: 'Your One-Time Passsword (OTP)',
             text:`Your OTP id: ${otp}`
         };
+        const info = await transporter.sendMail(mailOptions);
+        console.log('Email sent successfully!', info.response);
 
-        await transporter.sendMail(mailOptions, (err, info) => {
-            if (err) {
-                console.log('Error occurred while sendeing email:',err);
-            } else {
-                console.log('Email sent successfully!', info.response);
-            }
-        });
+        // await transporter.sendMail(mailOptions, (err, info) => {
+        //     if (err) {
+        //         console.log('Error occurred while sendeing email:',err);
+        //     } else {
+        //         console.log('Email sent successfully!', info.response);
+        //     }
+        // });
+        // return otp;
         
     }
     catch (err) {
@@ -53,20 +56,19 @@ async function sendEmail(email,otp) {
     
 };
 
-const verifyOTP = async (email,enteredOtp) => {
+const verifyOTP = async (generatedOtp,enteredOtp) => {
     try {
          
         // Check if the email and OTP are provided
-        if (!email || !enteredOtp) {
+        if (!generatedOtp || !enteredOtp) {
             return false;
         }
 
         // Check if the OTP matches
         // const generatedOTP = await sendEmail(email,enteredOtp);
-        console.log(enteredOtp);
-        console.log(OTP);
-        if (enteredOtp === OTP) {
-
+        // console.log(enteredOtp);
+        // console.log(OTP);
+        if (enteredOtp === generatedOtp) {
             return true;
         } else {
             return false;

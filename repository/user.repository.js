@@ -12,7 +12,8 @@ async function  findUserUsingEmail(email)  {
         } else {
             return [null,user];
         }
-    } catch (err) {
+    }
+    catch (err) {
         console.log(err);
         var errObj = {
             code: 500,
