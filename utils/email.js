@@ -20,7 +20,7 @@ async function sendEmail(email) {
             service: 'gmail',
             auth: {
                 user:"priyasingh86906@gmail.com",
-                pass:'hhry tmbk tknz nnfr'// 'strongpassword@12345'
+                pass:'hhry tmbk tknz nnfr'
             },
             port: 3000,
             host:'smtp.gmail.com'
