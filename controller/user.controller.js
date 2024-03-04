@@ -4,6 +4,84 @@ const joi_schema = require('../Joi/user/index')
 const User = require('../model/user');
 const findUserUsingEmail  = require('../repository/user.repository');
 
+const resetPassword = async (req, res) => {
+    try {
+        // Validate input
+        const { error } = joi_schema.resetPassword.validate(req.body);
+        if (error) return res.status(400).send(error.details[0].message);
+
+        // Find the user by email
+        const user = await User.findOne({ email: req.body.email });
+        if (!user) return res.status(400).send("User not found");
+
+        // Verify OTP
+        // const isVerified = await verifyOTP(user.otp, req.body.otp);
+        // if (!isVerified) return res.status(400).send("Invalid OTP");
+
+        if (req.body.newPassword != req.body.confirmPassword) {
+            return res.status(400).send("Password does not match.")
+        }
+        // Hash the new password
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(req.body.newPassword, salt);
+        
+        // Save the updated user object
+        await user.save();
+
+        return res.status(200).send("Password updated successfully");
+    } catch (error) {
+        console.error("Error in resetPassword:", error);
+        return res.status(500).send("Internal server error");
+    }
+};
+
+const forgotPasswordVerify = async (req, res) => {
+    try {
+        const { error } = joi_schema.otpVerifyJoi.validate(req.body);
+        if (error) return res.status(400).send(error.details[0].message);
+
+        const user = await User.findOne({ email:req.body.email });
+        if (!user) return res.status(400).send("User does not exist");
+
+        const isVerified = await verifyOTP(user.otp, req.body.otp);
+        if (isVerified) {
+            return res.status(200).send("Otp verified successfully.");
+        } else {
+            return res.status(400).send("Invalid otp entered");
+        }
+        
+    } catch (error) {
+        console.log("Error verifying otp:", error);
+        return res.status(500).send("Sometrhing went wrong");
+    }
+}
+
+
+const forgotPassword = async (req, res) => {
+    try {
+        const { error } = joi_schema.forgotPassword.validate(req.body);
+        if (error) return res.status(400).send(error.details[0].message);
+
+        let user = await User.findOne({ email:req.body.email });
+        if (!user) return res.status(400).send("User does not exist");
+
+        const otp = generateOtp();
+        
+        user.otp = otp;
+        user =await user.save();
+
+        await sendEmail(req.body.email, otp);
+
+
+        return res.status(200).send("OTP sent successfully");
+    } catch (err) {
+        console.log('Error in forgot password:', err);
+        return res.status(500).send("Internal server error");
+    }
+
+
+}
+
 const loggingIn = async (req, res) => {
     const { error } = joi_schema.loginVerify.validate(req.body);
     if (error) {
@@ -21,6 +99,7 @@ const loggingIn = async (req, res) => {
     const token = user.generateAuthToken();
     user.isActivated = true;
     user = await user.save();
+
 
     return res.send(token)
 }
@@ -128,5 +207,8 @@ module.exports = {
     // createUser,
     sendOtp,
     verifyOtp,
-    loggingIn
+    loggingIn,
+    resetPassword,
+    forgotPassword,
+    forgotPasswordVerify
 }
