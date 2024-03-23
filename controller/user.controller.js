@@ -5,26 +5,28 @@ const {
     notFoundResponse,
     handle304
 } = require('../utils/response');
+const jwt = require('jsonwebtoken');
 const { sendEmail, verifyOTP, generateOtp } = require('../utils/email');
 const bcrypt = require('bcrypt');
 const joi_schema = require('../Joi/user/index')
 const User = require('../model/user');
-const findUserUsingEmail  = require('../repository/user.repository');
+const { findUserByEmail,findUserById }  = require('../repository/user.repository');
 
-const resetPassword = async (req, res) => {//After verifying otp through this user can set new password
+
+
+const resetPassword = async (req, res) => {//If user wants to change password
     try {
-        // Validate input
         const { error } = joi_schema.resetPassword.validate(req.body);
-        if (error) return badRequestResponse(res,"Invalid data entered");
-
-        // Find the user by email
-        const [err, user] = await findUserUsingEmail(req.body.email);
-        if (err) {
-            return notFoundResponse(res,"No user found");
+        if (error) {
+            return badRequestResponse(res, 'Invalid password entered');
         }
 
-        if (req.body.newPassword != req.body.confirmPassword) {
-            return badRequestResponse(res,"Password doesn't match.");
+        const userId = req.user._id;
+
+        //Find user by id
+        const [err, user] = await findUserById(userId);
+        if (err) {
+            return notFoundResponse(res, 'User not found');
         }
 
         // Hash the new password
@@ -34,29 +36,67 @@ const resetPassword = async (req, res) => {//After verifying otp through this us
         // Save the updated user object
         await user.save();
 
-        return successResponse(res,user,"Password updated successfully")
-    }
-    catch (error) {
-        return serverErrorResponse(res, "Internal server error");
+
+        return successResponse(res,'Password reset successfully');
+        
+
+    } catch (err) {
+        console.log(err);
+        return serverErrorResponse(res, 'Something went wrong');
     }
 };
 
-const forgotPasswordVerify = async (req, res) => {//Verifies the otp entered by user
+//Function to generate a reset token
+const generateResetToken = async (req, res) => {
     try {
-        const { error } = joi_schema.otpVerifyJoi.validate(req.body);
+        const userId = req.user._id;
+
+        //Find user by Id
+        const [err,user] = await findUserById(userId);
+        if (err) {
+            return notFoundResponse(res, 'User not found');
+        }
+
+        const resetToken = user.generateResetToken();
+        res.header('reset-token', resetToken).send('Token for resetting the password is generated successfully');
+        // return res.json({ resetToken });
+
+    } catch (err) {
+        console.log(err);
+        return serverErrorResponse(res, 'Something Went Wrong');
+    }
+}
+
+const forgotPasswordVerify = async (req, res) => {//Verifies the otp entered by user and allows to change password
+    try {
+        const { error } = joi_schema.forgotPasswordVerify.validate(req.body);
         if (error) return badRequestResponse(res, "Invalid data entered");
 
-        const [err, user] = await findUserUsingEmail(req.body.email);
+
+
+        const [err, user] = await findUserByEmail(req.body.email);
         if (err) return badRequestResponse(res, "User does not exist");
 
         const isVerified = await verifyOTP(user.otp, req.body.otp);
         if (isVerified) {
-            return successResponse(res, "Otp verified successfully.");
+            if (req.body.newPassword != req.body.confirmPassword) {
+                return badRequestResponse(res,"Password doesn't match.");
+            }
+    
+            // Hash the new password
+            const salt = await bcrypt.genSalt(10);
+            user.password = await bcrypt.hash(req.body.newPassword, salt);
+            
+            // Save the updated user object
+            await user.save();
+    
+            return successResponse(res, user, "Password updated successfully");
+    
         } else {
             return badRequestResponse(res, "Invalid otp entered");
         }
-        
     } catch (error) {
+        console.log(error);
         return serverErrorResponse(res, "Sometrhing went wrong");
     }
 };
@@ -67,10 +107,10 @@ const forgotPassword = async (req, res) => {//Forgot password? Enter email then 
         const { error } = joi_schema.forgotPassword.validate(req.body);
         if (error) return badRequestResponse(res, "Invalid data entered");
 
-        let [err, user] = await findUserUsingEmail(req.body.email);
+        let [err, user] = await findUserByEmail(req.body.email);
         if (err) return badRequestResponse(res, "User does not exist");
 
-        const otp = generateOtp();
+        const otp = await generateOtp();
         
         user.otp = otp;
         user = await user.save();
@@ -91,20 +131,27 @@ const loggingIn = async (req, res) => {//You enter email and password and it fin
             return badRequestResponse(res,"Invalid data entered");
         }
     
-        let [err,user] = await findUserUsingEmail(req.body.email);
+        let [err,user] = await findUserByEmail(req.body.email);
         if (err) {
-            if (err.code == 400) return badRequestResponse(res, "User not found");
-            if (err.code == 500) return serverErrorResponse(res, "Internal server error.");
+            if (err.code == 400) {
+                return badRequestResponse(res, "User not found");
+            }
+                
+            if (err.code == 500) {
+                return serverErrorResponse(res, "Internal server error.");
+            }
         }
     
         const isValid = await bcrypt.compare(req.body.password, user.password);
-        if (!isValid) return res.status(400).send('Invalid email or password');
+        if (!isValid) {
+            return badRequestResponse(res, 'Invalid Email or Password');
+        }
     
         const token = user.generateAuthToken();
         user.isActivated = true;
         user = await user.save();
-        
-        return successResponse(res, token, "Successfully logged in");
+        res.setHeader('x-auth-token', token);
+        return successResponse(res, null, "Successfully logged in");
     } catch (err) {
         return serverErrorResponse(res,"Something went wrong")
     }
@@ -112,35 +159,33 @@ const loggingIn = async (req, res) => {//You enter email and password and it fin
 }
 
 const verifyOtp = async (req, res) => {//Verifies the otp entered with otp sent 
-    /** Verify OTP:
-            1. Joi Validation
-            2. Check for email exist or not , if not give error
-            3. Compare OTP from user’s input from db
-            4. If comparison returns valid (True) then make isActivated True 
-            5. Create Token with required payload
-            6. Return token
-    **/
-
     try {
-        const { error } = joi_schema.otpVerifyJoi.validate({
-            email: req.body.email,
-            otp:req.body.otp
-        });
+        const { error } = joi_schema.otpVerifyJoi.validate(req.body);//only otp
         if (error) {
-            return badRequestResponse(res,"Invalid data entered");
+            return badRequestResponse(res,"Invalid otp entered");
         }
-
-        const [err,user] = await findUserUsingEmail(req.body.email);
+        
+        const [err, user] = await findUserByEmail(req.body.email);
+        console.log("Error: ",err);
+        console.log("User promise: ",userPromise);
 
         if (err) {
-            if (err.code == 400) return badRequestResponse(res, "User not found");
-            if (err.code == 500) return serverErrorResponse(res, "Internal server error.");
+            if (err.code === 404){
+                return badRequestResponse(res, "User not found");
+            }
+            if (err.code === 500) {
+                return serverErrorResponse(res, "Internal server error.");
+            }
         }
+
+        console.log("User", user);
+        console.log("Otp from db: ", user.otp);
+        console.log("Otp entered: ",req.body.otp);
         
         const isVerified = await verifyOTP(user.otp, req.body.otp);
         if (isVerified === true) {
             user.isActivated = true;
-            user=await user.save();
+            await user.save();
             
             const token = user.generateAuthToken();
 
@@ -150,7 +195,7 @@ const verifyOtp = async (req, res) => {//Verifies the otp entered with otp sent
         }
         
     } catch (err) {
-
+        console.log(err);
         return serverErrorResponse(res,"Internal server error.");
     }
 }
@@ -158,7 +203,7 @@ const verifyOtp = async (req, res) => {//Verifies the otp entered with otp sent
 const sendOtp = async (req, res) => {//sends otp on given emailId and saves user's data in DB
  
 //search for user in DB
-    const [err,user] = await findUserUsingEmail(req.body.email);
+    const [err,user] = await findUserByEmail(req.body.email);
     
     if (err) {//If no user
         if (err.code == 404) {//If user not found then create a user
@@ -168,7 +213,7 @@ const sendOtp = async (req, res) => {//sends otp on given emailId and saves user
                 if (error) {
                     return badRequestResponse(res,"Invalid data entered");
                 }
-                const otp = generateOtp();
+                const otp = await generateOtp();
                 await sendEmail(req.body.email, otp);
                 let user = new User({
                     firstName: req.body.firstName,
@@ -181,7 +226,7 @@ const sendOtp = async (req, res) => {//sends otp on given emailId and saves user
                 const salt = await bcrypt.genSalt(12);
                 user.password = await bcrypt.hash(user.password, salt);
                 user = await user.save();
-                return successResponse(res,"User saved in database");
+                return successResponse(res,user,"User saved in database");
             } catch (err) {//If there is some error while creating the user do this 
                 console.log(err);
                 return serverErrorResponse(res,"Internal server error");
@@ -189,7 +234,7 @@ const sendOtp = async (req, res) => {//sends otp on given emailId and saves user
         } else {//If error code is other than 404
             return serverErrorResponse(res,"Internal Server Error: unable to generate OTP");
         }
-        
+    
     } else {//If no error => user exist with the given data
         return badRequestResponse(res,"User already registered");
     }
@@ -205,5 +250,7 @@ module.exports = {
     loggingIn,
     resetPassword,
     forgotPassword,
-    forgotPasswordVerify
+    forgotPasswordVerify,
+    generateResetToken,
+    resetPassword
 }

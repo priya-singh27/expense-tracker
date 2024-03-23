@@ -9,7 +9,3 @@ module.exports = joi.object().keys({
     otp:joi.string()
 });
 
-/**
-  $Env:Secret_Key= 'mySecretKey'
-$env:NODE_ENV = "test" ; node index.js
- */

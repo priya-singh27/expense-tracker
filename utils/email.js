@@ -1,14 +1,19 @@
 require('dotenv').config();
+const User = require('../model/user');
 const nodemailer = require('nodemailer');
 const userEmail = process.env.USER;
 const pass = process.env.PASS;
 
 
-function generateOtp() {
+async function generateOtp() {
     const digits = '0123456789';
     let OTP = '';
     for (let i = 0; i < 6; i++){
         OTP = OTP + digits[Math.floor(Math.random() * 10)] ;
+    }
+    const existingUser = await User.findOne({ otp: OTP });
+    if (existingUser) {
+        return generateOtp();
     }
 
     return OTP;
