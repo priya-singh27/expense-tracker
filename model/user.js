@@ -16,15 +16,15 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default:false
     },
-    Friends: [{
+    friends: [{
         type: mongoose.Schema.Types.ObjectId,
         ref:'User'
     }],
-    RequestReceived: [{
+    requestReceived: [{
         type: mongoose.Schema.Types.ObjectId,
         ref:'User'
     }],
-    RequestSent: [{
+    requestSent: [{
         type: mongoose.Schema.Types.ObjectId,
         ref:'User'
     }]

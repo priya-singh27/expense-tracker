@@ -1,4 +1,62 @@
 const User = require('../model/user');
+async function findByIdAndUpdateRequestReceived(receiversId,sendersId) {
+    try {
+        const user = await User.findByIdAndUpdate(
+            receiversId,
+            {
+                $addToSet:{requestReceived : sendersId}
+            },
+            {new:true}
+        );
+        if (!user) {
+            var errObj = {
+                code: 404,
+                message:"User not found"
+            }
+
+            return [errObj, null];
+        }else {
+            return [null, user];
+        }
+        
+    } catch (err) {
+        console.log(err);
+        var errObj = {
+            code: 500,
+            message:'Something went wrong'
+        }
+        return [errObj,null];
+    }
+}
+async function findByIdAndUpdateRequestSent(sendersId,receiversId) {
+    try {
+        const user = await User.findByIdAndUpdate(
+            sendersId,
+            {
+                $addToSet:{requestSent : receiversId}
+            },
+            {new:true}
+        );
+        if (!user) {
+            var errObj = {
+                code: 404,
+                message:"User not found"
+            }
+
+            return [errObj, null];
+        }else {
+            return [null, user];
+        }
+        
+    } catch (err) {
+        console.log(err);
+        var errObj = {
+            code: 500,
+            message:'Something went wrong'
+        }
+        return [errObj,null];
+    }
+}
 
 async function findUserById(userId) {
     try {
@@ -50,5 +108,7 @@ async function  findUserByEmail(email)  {
 
 module.exports = {
     findUserByEmail,
-    findUserById
+    findUserById,
+    findByIdAndUpdateRequestSent,
+    findByIdAndUpdateRequestReceived
 }

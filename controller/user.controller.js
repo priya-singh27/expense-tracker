@@ -10,9 +10,40 @@ const { sendEmail, verifyOTP, generateOtp } = require('../utils/email');
 const bcrypt = require('bcrypt');
 const joi_schema = require('../Joi/user/index')
 const User = require('../model/user');
-const { findUserByEmail,findUserById }  = require('../repository/user.repository');
+const { findUserByEmail,findUserById,findByIdAndUpdateRequestReceived,findByIdAndUpdateRequestSent }  = require('../repository/user.repository');
 
+const addFriend = async (req, res) => {
+    try {
+        const authenticatedUserId = req.user._id;
+        const [err, sender] = await findByIdAndUpdateRequestSent(authenticatedUserId, req.body._id);
+        const [error, receiver] = await findByIdAndUpdateRequestReceived(req.body._id, authenticatedUserId);
+        if (sender && receiver) {
+            return successResponse(res, null, 'Sent the request');
+        } 
+        
+    } catch (err) {
+        console.log(err);
+        return badRequestResponse(res, 'Something went wrong');
+    }
+}
 
+const searchFriend = async (req,res) => {
+    try {
+        const { error } = joi_schema.email.validate(req.body);
+        if (error) {
+            return badRequestResponse(res, 'Invalid password entered');
+        }
+        const [err, user] = await findUserByEmail(req.body.email);
+        if (err) {
+            return notFoundResponse(res, 'User not found');
+        }
+
+        return successResponse(res, user._id, 'We found the user.');
+    } catch (err) {
+        console.log(err);
+        return serverErrorResponse(res,'Something went wrong.')
+   }
+}
 
 const resetPassword = async (req, res) => {//If user wants to change password
     try {
@@ -104,7 +135,7 @@ const forgotPasswordVerify = async (req, res) => {//Verifies the otp entered by 
 
 const forgotPassword = async (req, res) => {//Forgot password? Enter email then we'll verify if a user with the given email exist or not if exist you will receive an otp otherwise you'll get bad request response.
     try {
-        const { error } = joi_schema.forgotPassword.validate(req.body);
+        const { error } = joi_schema.email.validate(req.body);
         if (error) return badRequestResponse(res, "Invalid data entered");
 
         let [err, user] = await findUserByEmail(req.body.email);
@@ -126,7 +157,7 @@ const forgotPassword = async (req, res) => {//Forgot password? Enter email then 
 
 const loggingIn = async (req, res) => {//You enter email and password and it finds user with the given email if not exist you'll get badRequest as a response, if its correct entered password will be matched with stored password and if it is correct congrats! you are logged in otherwise you will get badRequest as a response
     try { 
-        const { error } = joi_schema.loginVerify.validate(req.body);
+        const { error } = joi_schema.emailPassword.validate(req.body);
         if (error) {
             return badRequestResponse(res,"Invalid data entered");
         }
@@ -160,14 +191,12 @@ const loggingIn = async (req, res) => {//You enter email and password and it fin
 
 const verifyOtp = async (req, res) => {//Verifies the otp entered with otp sent 
     try {
-        const { error } = joi_schema.otpVerifyJoi.validate(req.body);//only otp
+        const { error } = joi_schema.emailOtpJoi.validate(req.body);//only otp
         if (error) {
             return badRequestResponse(res,"Invalid otp entered");
         }
         
         const [err, user] = await findUserByEmail(req.body.email);
-        console.log("Error: ",err);
-        console.log("User promise: ",userPromise);
 
         if (err) {
             if (err.code === 404){
@@ -187,9 +216,7 @@ const verifyOtp = async (req, res) => {//Verifies the otp entered with otp sent
             user.isActivated = true;
             await user.save();
             
-            const token = user.generateAuthToken();
-
-            return successResponse(res,token,"Otp verified successfully");
+            return successResponse(res,null,"Otp verified successfully");
         } else if(isVerified === false) {
             return res.status(400).send("Either email or otp entered is incorrect");
         }
@@ -252,5 +279,7 @@ module.exports = {
     forgotPassword,
     forgotPasswordVerify,
     generateResetToken,
-    resetPassword
+    resetPassword,
+    searchFriend,
+    addFriend
 }
