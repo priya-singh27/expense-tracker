@@ -5,20 +5,117 @@ const {
     notFoundResponse,
     handle304
 } = require('../utils/response');
+
+const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const { sendEmail, verifyOTP, generateOtp } = require('../utils/email');
 const bcrypt = require('bcrypt');
 const joi_schema = require('../Joi/user/index')
 const User = require('../model/user');
-const { findUserByEmail,findUserById,findByIdAndUpdateRequestReceived,findByIdAndUpdateRequestSent }  = require('../repository/user.repository');
+const { findUserByEmail,findUserById,findByIdAndUpdateRequestReceived,findByIdAndUpdateRequestSent,findAllReceivedFriendReq,findAllSentFriendReq,findIfTheyAreFriends }  = require('../repository/user.repository');
+
+const rejectRequest = async (req, res) => {
+    try {
+        const acceptorsId = req.user._id;
+        const sendersId = req.params.id;
+        if (!sendersId || (!mongoose.Types.ObjectId.isValid(sendersId))) {
+            return badRequestResponse(res, 'Bad Request');
+        }
+
+        const acceptor = await User.findById(acceptorsId).populate('requestReceived');
+        const senderInRequests = acceptor.requestReceived.find(user => user._id.equals(sendersId));
+
+        acceptor.requestReceived.pull(senderInRequests);
+
+        senderInRequests.requestSent.pull(acceptor);
+
+        await acceptor.save();
+        await senderInRequests.save();
+
+        return successResponse(res, 'Request rejected.');
+
+    } catch (err) {
+        console.log(err);
+        return serverErrorResponse(res, 'Something Went Wrong');
+    }
+}
+
+const approveRequest = async (req, res)=>{
+    try {
+        const acceptorsId = req.user._id;
+        const sendersId = req.params.id;
+        
+        if (!sendersId || (!mongoose.Types.ObjectId.isValid(sendersId))) {
+            return badRequestResponse(res,'Bad Request')
+        }
+        const acceptor = await User.findById(acceptorsId).populate('requestReceived');
+
+        const senderInRequests= acceptor.requestReceived.find(user => user._id.equals(sendersId));//For each user object in requestReceived it will check user._id.equals(sendersId)      
+
+        
+        //remove frien request from requestReceived and add in friends
+        acceptor.requestReceived.pull(senderInRequests);
+        acceptor.friends.push(senderInRequests);
+
+        //remove frien request from requestReceived and add in friends
+        senderInRequests.requestSent.pull(acceptorsId);
+        senderInRequests.friends.push(acceptorsId);
+
+        await acceptor.save();
+        await senderInRequests.save();
+
+        return successResponse(res, null, 'Friend request approved successfully');
+    } catch (err) {
+        console.log(err);
+        return serverErrorResponse(res, 'Something Went Wrong');
+    }
+}
+
+const getSentFriendRequests = async (req, res) => {
+    try {
+        const userid = req.user._id;
+        const [err, sentReq] = await findAllSentFriendReq(userid);
+
+        if (!sentReq || sentReq.length === 0) {
+            return successResponse(res, [], 'No friend requests sent.');
+        }
+
+        return successResponse(res, sentReq, 'List of all sent friend requests.');
+
+    } catch (err) {
+        console.log(err);
+        return serverErrorResponse(res, 'Something went wrong.');
+    }
+}
+
+const getReceivedFriendRequests = async (req, res) => {
+    try {
+        const userid = req.user._id;
+        const [err, receivedReq] = await findAllReceivedFriendReq(userid);
+
+        if (!receivedReq || receivedReq.length === 0) {
+            return successResponse(res, [], 'No received friend requests found.');
+        }
+
+        return successResponse(res, receivedReq, 'List of all received friend requests.');
+
+    } catch (err) {
+        console.log(err);
+        return serverErrorResponse(res, 'Something went wrong.');
+    }
+}
 
 const addFriend = async (req, res) => {
     try {
         const authenticatedUserId = req.user._id;
+        const [Error, friend] = await findIfTheyAreFriends(authenticatedUserId, req.body._id);
+        if (friend) {
+            return badRequestResponse(res, 'You are already in their friends list');
+        }
         const [err, sender] = await findByIdAndUpdateRequestSent(authenticatedUserId, req.body._id);
         const [error, receiver] = await findByIdAndUpdateRequestReceived(req.body._id, authenticatedUserId);
         if (sender && receiver) {
-            return successResponse(res, null, 'Sent the request');
+            return successResponse(res,req.body._id, 'Sent the request');
         } 
         
     } catch (err) {
@@ -281,5 +378,9 @@ module.exports = {
     generateResetToken,
     resetPassword,
     searchFriend,
-    addFriend
+    addFriend,
+    getReceivedFriendRequests,
+    getSentFriendRequests,
+    approveRequest,
+    rejectRequest
 }
