@@ -1,5 +1,4 @@
 const User = require('../model/user');
-const { badRequestResponse, serverErrorResponse } = require('../utils/response');
 
 async function findIfTheyAreFriends(sendersId,receiversId) {
     try {
