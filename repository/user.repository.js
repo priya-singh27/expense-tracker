@@ -1,19 +1,51 @@
 const User = require('../model/user');
 
-async function findIfTheyAreFriends(sendersId,receiversId) {
+async function isRequestSent(sendersId,receiversId) {
     try {
         const sender = await User.findById(sendersId);
-        // const receiver = await User.findById(receiversId);
-
-        const receiverInRequests = sender.friends.find(user => user._id.equals(receiversId));
-        if (receiverInRequests) {
-            return [null,receiverInRequests];
+        const receiverInSentReq = sender.requestSent.find(user => user._id.equals(receiversId));
+        
+        if (receiverInSentReq) {
+            return [null, receiverInSentReq];
         }
+        var errObj = {
+            code: 404,
+            message:'Bad Request'
+        }
+        return [errObj, null];
     } catch (err) {
         console.log(err);
         var errObj = {
             code: 500,
-            message:'Something Went Wrong'
+            message:'Something went wrong'
+        }
+
+        return [errObj, null];
+    }
+
+}
+
+async function findIfTheyAreFriends(sendersId,receiversId) {
+    try {
+        const sender = await User.findById(sendersId);
+        const receiverInFriends = sender.friends.find(user => user._id.equals(receiversId));
+        
+        if (receiverInFriends) {
+            return [null, receiverInFriends];
+        }
+        var errObj = {
+            code: 404,
+            message:'Bad Request'
+        }
+
+        return [errObj, null];
+        
+
+    } catch (err) {
+        console.log(err);
+        var errObj = {
+            code: 500,
+            message:'Something Went Wrong in repo'
         }
         return [errObj,null];
     }
@@ -163,5 +195,6 @@ module.exports = {
     findByIdAndUpdateRequestReceived,
     findAllReceivedFriendReq,
     findAllSentFriendReq,
-    findIfTheyAreFriends
+    findIfTheyAreFriends,
+    isRequestSent
 }

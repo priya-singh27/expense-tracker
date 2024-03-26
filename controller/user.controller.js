@@ -5,14 +5,13 @@ const {
     notFoundResponse,
     handle304
 } = require('../utils/response');
-
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const { sendEmail, verifyOTP, generateOtp } = require('../utils/email');
 const bcrypt = require('bcrypt');
-const joi_schema = require('../Joi/user/index')
+const joi_schema = require('../Joi/user/index');
 const User = require('../model/user');
-const { findUserByEmail,findUserById,findByIdAndUpdateRequestReceived,findByIdAndUpdateRequestSent,findAllReceivedFriendReq,findAllSentFriendReq,findIfTheyAreFriends }  = require('../repository/user.repository');
+const { findUserByEmail,findUserById,findByIdAndUpdateRequestReceived,findByIdAndUpdateRequestSent,findAllReceivedFriendReq,findAllSentFriendReq,findIfTheyAreFriends,isRequestSent }  = require('../repository/user.repository');
 
 const rejectRequest = async (req, res) => {
     try {
@@ -34,7 +33,8 @@ const rejectRequest = async (req, res) => {
 
         return successResponse(res, 'Request rejected.');
 
-    } catch (err) {
+    }
+    catch (err) {
         console.log(err);
         return serverErrorResponse(res, 'Something Went Wrong');
     }
@@ -109,18 +109,24 @@ const addFriend = async (req, res) => {
     try {
         const authenticatedUserId = req.user._id;
         const [Error, friend] = await findIfTheyAreFriends(authenticatedUserId, req.body._id);
-        if (friend) {
-            return badRequestResponse(res, 'You are already in their friends list');
-        }
-        const [err, sender] = await findByIdAndUpdateRequestSent(authenticatedUserId, req.body._id);
-        const [error, receiver] = await findByIdAndUpdateRequestReceived(req.body._id, authenticatedUserId);
-        if (sender && receiver) {
-            return successResponse(res,req.body._id, 'Sent the request');
-        } 
+        const [Err, inSentReq] = await isRequestSent(authenticatedUserId, req.body._id);
         
-    } catch (err) {
+        if (friend || inSentReq) {
+            return badRequestResponse(res, 'Bad request');
+        }
+
+        if (Error && Err ) {
+            const [err, sender] = await findByIdAndUpdateRequestSent(authenticatedUserId, req.body._id);
+            const [error, receiver] = await findByIdAndUpdateRequestReceived(req.body._id, authenticatedUserId);
+
+            if (sender && receiver) {
+                return successResponse(res, req.body._id, 'Sent the request');
+            } 
+        }        
+    }
+    catch(err) {
         console.log(err);
-        return badRequestResponse(res, 'Something went wrong');
+        return serverErrorResponse(res, 'Something went wrong');
     }
 }
 
@@ -326,7 +332,7 @@ const verifyOtp = async (req, res) => {//Verifies the otp entered with otp sent
 
 const sendOtp = async (req, res) => {//sends otp on given emailId and saves user's data in DB
  
-//search for user in DB
+    //search for user in DB
     const [err,user] = await findUserByEmail(req.body.email);
     
     if (err) {//If no user
@@ -368,7 +374,6 @@ const sendOtp = async (req, res) => {//sends otp on given emailId and saves user
 
 
 module.exports = {
-    // createUser,
     sendOtp,
     verifyOtp,
     loggingIn,

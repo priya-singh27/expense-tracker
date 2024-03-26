@@ -1,6 +1,6 @@
 const { unauthorizedResponse } = require('../utils/response');
 const jwt = require('jsonwebtoken');
-const secretKey = process.env.Secret_Key;
+const secretKey = process.env.secret_Key;
 
 const authMiddleware = (req, res, next) => {
     const authToken = req.header('x-auth-token');
