@@ -46,7 +46,7 @@ const approveRequest = async (req, res)=>{
         const sendersId = req.params.id;
         
         if (!sendersId || (!mongoose.Types.ObjectId.isValid(sendersId))) {
-            return badRequestResponse(res,'Bad Request')
+            return badRequestResponse(res, 'Bad Request');
         }
         const acceptor = await User.findById(acceptorsId).populate('requestReceived');
 

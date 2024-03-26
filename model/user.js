@@ -27,6 +27,10 @@ const userSchema = new mongoose.Schema({
     requestSent: [{
         type: mongoose.Schema.Types.ObjectId,
         ref:'User'
+    }],
+    expenses: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref:'Expense'
     }]
 
 });

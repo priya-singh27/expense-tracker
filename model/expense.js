@@ -9,7 +9,7 @@ const ExpenseSchema = new mongoose.Schema({
     },
     category: {
         type: String,
-        enum:['Food','Transportation','Utilities','Entertainment','Healthcare','vacation']
+        enum:['Food','Transportation','Utilities','Entertainment','Healthcare','vacation','Shopping']
     }
 });
 

@@ -1,27 +1,5 @@
 const Expense = require('../model/expense');
 
-async function findAllExpenses() {
-    try {
-        let expenses = await Expense.find();
-        if (!expenses) {
-            var errObj = {
-                code: 404,
-                message:'No expense found'
-            }
-            return [errObj, null];
-        }
-
-        return [null, expenses];
-    }
-    catch (err) {
-        console.log(err);
-        var errObj = {
-            code: 500,
-            message:'No expense found'
-        }
-        return [errObj,null]
-    }
-}
 
 async function findByIdAndDelete(id) {
     try {
@@ -77,5 +55,4 @@ async function findExpenseByIdAndUpdate(id,title,amount,date,category) {
 module.exports = {
     findExpenseByIdAndUpdate,
     findByIdAndDelete,
-    findAllExpenses
 }
