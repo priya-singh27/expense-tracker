@@ -31,6 +31,10 @@ const userSchema = new mongoose.Schema({
     expenses: [{
         type: mongoose.Schema.Types.ObjectId,
         ref:'Expense'
+    }],
+    splitBill: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref:'SplitBill'
     }]
 
 });
