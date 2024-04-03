@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref:'Expense'
     }],
-    splitBill: [{
+    splitBills: [{
         type: mongoose.Schema.Types.ObjectId,
         ref:'SplitBill'
     }]
