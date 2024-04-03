@@ -54,16 +54,16 @@ const updateSplitBill = async (req, res) => {
     }
 }
 
-const addMyAmount = async (req, res) =>{
-    try {
-        const userId = req.user._id;
+// const addMyAmount = async (req, res) =>{
+//     try {
+//         const userId = req.user._id;
         
-    }
-    catch (err) {
-        console.log(err);
-        return serverErrorResponse(res, 'Something went wrong');
-    }
-}
+//     }
+//     catch (err) {
+//         console.log(err);
+//         return serverErrorResponse(res, 'Something went wrong');
+//     }
+// }
 
 const addCreatorAsParticipant = async (req, res) => {
     try {
