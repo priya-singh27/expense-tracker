@@ -1,6 +1,7 @@
 const { areFriends, findUserById, findUserByEmail } = require('../repository/user.repository');
 const SplitBill = require('../model/splitBill');
 const User = require('../model/user');
+const splitBill = require('../Joi/splitBill');
 
 // async function updateBill(billId,updatedParticipants) {
 //     try {
@@ -83,7 +84,108 @@ const User = require('../model/user');
 //     }
 // }
 
+async function addMyAmount(userId,billId,myAmount) {
+    try {
+        // const user = await User.findById(userId).populate('splitBills');
+        // if (!user) {
+        //     var errObj = {
+        //         code: 400,
+        //         message:'Bad request'
+        //     }
+        //     retrun[errObj, null];
+        // }
 
+        // const userBill = user.splitBills.find(bill => bill._id.equals(billId));
+
+        const bill = await SplitBill.findById(billId).populate('participants');
+        
+        
+        if (!bill ) {
+            var errObj = {
+                code: 404,
+                message: 'No bill found'
+            }
+            return [errObj, null];
+        }
+
+        const participant = bill.participants.find(participant => participant.participant.equals(userId));
+        if (participant) {
+            participant.amount = myAmount;
+            await bill.save();
+            // console.log(bill);
+        } else {
+            let errObj = {
+                code: 400,
+                message:'Participant not found in the bill'
+            }
+            return [errObj, null];
+        }
+
+        
+        const leftOutAmountResult = await SplitBill.aggregate([
+            {
+                $match: { _id: billId }
+            },
+            {
+                $project: {
+                    totalParticipantAmount: { $sum: '$participants.amount' }
+                }
+            },
+            {
+                $project: {
+                    leftOutAmount: {
+                        $subtract: ['$totalAmount', '$totalParticipantAmount']
+                    }
+                }
+            }
+        ]);
+        
+
+        // const leftOutAmountResult = await SplitBill.aggregate([
+        //     {
+        //         $match: { _id: billId },//match the newly created split bill
+        //     },
+
+        //     {
+        //         $project: {
+        //             leftOutAmount: {
+                        
+        //                 $cond: [
+                        
+        //                     { $eq: ["$splitBillMethodology", "Custom"] },//if splitBillMethodology==Custom
+        //                     { $subtract: [myAmount, {$sum: "$participants.amount"}] },//Do this 
+        //                     { $subtract: [myAmount, { $multiply: [{ $size: "$participants" }, { $divide: [ myAmount, { $size: "$participants" } ] }] }] },//Otherwise do this
+        //                 ],
+            
+        //             },
+        //         },
+        //     },
+        // ]);
+        console.log("leftOutAmountResult "+leftOutAmountResult);
+        // console.log("leftOutAmount "+bill.leftOutAmount);
+        if (leftOutAmountResult.length>0) {
+            bill.leftOutAmount = leftOutAmountResult[0].leftOutAmount;
+            await bill.save();
+        } else {
+            let errObj = {
+                code: 500,
+                message:'Error in aggregation pipeline'
+            }
+            return [errObj, null];
+        }
+
+        return [null, bill];
+        
+    }
+    catch (err) {
+        console.log(err);
+        let errObj = {
+            code: 500,
+            message:'Something went wrong'
+        }
+        return [errObj, null];
+    }
+}
 
 async function addCreatedSplitBillToEachParticipants(participants,newSplitBill,creatorId) {
     try {
@@ -127,6 +229,7 @@ async function addCreatedSplitBillToEachParticipants(participants,newSplitBill,c
 
 module.exports = {
     addCreatedSplitBillToEachParticipants,
+    addMyAmount
     // findSplitBillById,
     // updateBill
 }

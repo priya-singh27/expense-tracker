@@ -1,3 +1,4 @@
 module.exports = {
-    createSplitBill:require('./createSplitBill'),
+    createSplitBill: require('./createSplitBill'),
+    addAmount:require('./addAmount')
 }

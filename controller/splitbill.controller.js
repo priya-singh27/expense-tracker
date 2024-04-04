@@ -1,4 +1,4 @@
-const { addCreatedSplitBillToEachParticipants} = require('../repository/splitBill.repository');
+const { addCreatedSplitBillToEachParticipants,addMyAmount} = require('../repository/splitBill.repository');
 const mongoose = require('mongoose');
 const SplitBill = require('../model/splitBill');
 const { findIfTheyAreFriends, findUserById } = require('../repository//user.repository');
@@ -54,21 +54,46 @@ const updateSplitBill = async (req, res) => {
     }
 }
 
-// const addMyAmount = async (req, res) =>{
-//     try {
-//         const userId = req.user._id;
+const addAmount = async (req, res) =>{
+    try {
+        const { error } = joi_schema.addAmount.validate(req.body);
+        if (error) {
+            return badRequestResponse(res, 'Invalid data entered');
+        }
+
+        const userId = req.user._id;
+        const billId = req.params.id;
+
+        const [err, bill] = await addMyAmount(userId, billId,req.body.amount);
+        if (err) {
+            if (err.code == 400) {
+                return badRequestResponse(res, 'Bad Request In controller');
+            }
+            if (err.code == 404) {
+                return notFoundResponse(res, 'No bill found');
+            }
+
+            if (err.code == 500) {
+                return serverErrorResponse(res, err.message);
+            }
+        }
+
+        return successResponse(res, bill, 'Your amount has been added successfully');
         
-//     }
-//     catch (err) {
-//         console.log(err);
-//         return serverErrorResponse(res, 'Something went wrong');
-//     }
-// }
+    }
+    catch (err) {
+        console.log(err);
+        return serverErrorResponse(res, 'Something went wrong In controller');
+    }
+}
 
 const addCreatorAsParticipant = async (req, res) => {
     try {
+
         const userId = req.user._id;
+
         const billId = req.params.id;
+        
         const user = await User.findById(userId).populate('splitBills');
         if (!user) {
             return badRequestResponse(res, 'Bad request');
@@ -127,44 +152,7 @@ const addParticipants = async (req, res) => {
         user.splitBills.push(newSplitBill._id);
         await user.save();
 
-        // const leftOutAmountResult = await SplitBill.aggregate([
-        //     {
-        //         $match: { _id: newSplitBill._id },//match the newly created split bill
-        //     },
-        //     {
-        //         $unwind:"$participants",
-        //     },
-        //     {
-        //         $group: {
-        //             _id: "$_id",
-        //             totalAmount: { $first: "$totalAmount" },
-        //             splitBillMethodology: { $first: "$splitBillMethodology" },
-        //             totalParticipants: { $sum: 1},
-        //             totalParticipantAmount:{$sum:"$participants.amount"}
-        //         }
-        //     },
-
-        //     {
-        //         $project: {
-        //             leftOutAmount: {
-                       
-        //                 $cond: [
-                        
-        //                     { $eq: ["$splitBillMethodology", "Custom"] },//if splitBillMethodology==Custom
-        //                     { $subtract: ["$totalAmount", "$totalParticipantAmount"] },//Do this 
-        //                     { $subtract: ['$totalAmount', { "$multiply": [ '$totalParticipants', { "$divide": ["$totalAmount", "$totalParticipants"] }] }] },//Otherwise do this
-        //                 ],
-        //             },
-        //         },
-        //     },
-        // ]);
-        
-        // if (leftOutAmountResult.length > 0) {
-        //     newSplitBill.leftOutAmount = leftOutAmountResult[0].leftOutAmount;
-        //     await newSplitBill.save();
-        // } else {
-        //     return serverErrorResponse(res,'Aggregation did not work properly')
-        // }
+     
 
         const [Error,message]=await addCreatedSplitBillToEachParticipants(participants, newSplitBill, userId);
         if (Error) {
@@ -196,5 +184,6 @@ const addParticipants = async (req, res) => {
 module.exports = {
     addParticipants,
     addCreatorAsParticipant,
+    addAmount,
     updateSplitBill
 }
