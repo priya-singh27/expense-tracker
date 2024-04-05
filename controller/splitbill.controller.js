@@ -6,53 +6,6 @@ const joi_schema = require('../Joi/splitBill/index');
 const {badRequestResponse,notFoundResponse,serverErrorResponse,successResponse,unauthorizedResponse,handle304 } = require('../utils/response');
 const User = require('../model/user');
 const splitBill = require('../Joi/splitBill/index');
-const { use } = require('../routes/splitBill');
-
-const updateSplitBill = async (req, res) => {
-    try {
-        const { error } = joi_schema.createSplitBill.validate(req.body);
-        if (error) {
-            return badRequestResponse(res, 'Invalid data entered');
-        }
-        const splitBillId = req.params.id;
-        if (!splitBillId || !mongoose.Types.ObjectId.isValid(splitBillId)) {
-            return badRequestResponse(res, 'invalid bill id given');
-        }
-        const [err, bill] = await findSplitBillById(splitBillId);
-        if (err) {
-            if (err.code === 404) {
-                return notFoundResponse(res, err.message);
-            }
-            if (err.code === 500) {
-                return serverErrorResponse(res, err.message);
-            }
-        }
-        const [Error, message] = await updateBill(splitBillId, req.body.participants);
-
-        bill.title = req.body.title;
-        bill.amount = req.body.amount;
-        bill.billAmount = req.body.billAmount;
-        bill.description = req.body.description;
-        bill.participants = req.body.participants;
-
-        await bill.save();
-
-        if (Error) {
-            if (Error.code == 404) {
-                return notFoundResponse(res, 'Not found');
-            } if (Error.code == 500) {
-                return serverErrorResponse(res, 'Something went wrong');
-            }
-        }
-
-        return successResponse(res, 'Updated successfully');
-
-
-    } catch (err) {
-        console.log(err);
-        return serverErrorResponse(res, 'Something Went Wrong');
-    }
-}
 
 const addAmount = async (req, res) =>{
     try {
