@@ -1,4 +1,4 @@
-const { addCreatedSplitBillToEachParticipants,addMyAmount} = require('../repository/splitBill.repository');
+const { addCreatedSplitBillToEachParticipants,addMyAmount,updateBillById} = require('../repository/splitBill.repository');
 const mongoose = require('mongoose');
 const SplitBill = require('../model/splitBill');
 const { findIfTheyAreFriends, findUserById } = require('../repository//user.repository');
@@ -6,6 +6,42 @@ const joi_schema = require('../Joi/splitBill/index');
 const {badRequestResponse,notFoundResponse,serverErrorResponse,successResponse,unauthorizedResponse,handle304 } = require('../utils/response');
 const User = require('../model/user');
 const splitBill = require('../Joi/splitBill/index');
+
+const updateBill = async (req, res) => {
+    try {
+
+        const { error } = joi_schema.createSplitBill.validate(req.body);
+        if (error) {
+            return badRequestResponse(res, 'invalid data entered');
+        }
+        
+        const { title, participants, totalAmount, splitBillMethodology } = req.body;
+
+
+        const userId = req.user._id;
+        const billId = req.params.id;
+        
+        if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(billId)) {
+            return badRequestResponse(res, 'Invalid id');
+        }
+
+        const [err, bill] = await updateBillById(userId, billId, title, participants, totalAmount, splitBillMethodology);
+        if (err) {
+            if (err.code == 404) {
+                return notFoundResponse(res, 'Either user or bill not found');
+            }
+            if (err.code == 500) {
+                return serverErrorResponse(res, 'Error in updating bill');
+            }
+        }
+        
+        return successResponse(res,bill,"Updated")
+    }
+    catch (err) {
+        console.log(err);
+        return serverErrorResponse(res, "something went wrong");
+    }
+}
 
 const addAmount = async (req, res) =>{
     try {
@@ -91,19 +127,20 @@ const addParticipants = async (req, res) => {
             participants,
             totalAmount,
             splitBillMethodology,
-            leftOutAmount:totalAmount
+            leftOutAmount: totalAmount,
+            createdBy:userId
         });
 
         await newSplitBill.save();
 
-        const [err, user] = await findUserById(userId);
-        if (err) {
-            if (err.code == 404) return notFoundResponse(res, 'User not found');
-            if (err.code == 500) return serverErrorResponse(res, 'Something went wrong');
-        }
+        // const [err, user] = await findUserById(userId);
+        // if (err) {
+        //     if (err.code == 404) return notFoundResponse(res, 'User not found');
+        //     if (err.code == 500) return serverErrorResponse(res, 'Something went wrong');
+        // }
 
-        user.splitBills.push(newSplitBill._id);
-        await user.save();
+        // user.splitBills.push(newSplitBill._id);
+        // await user.save();
 
      
 
@@ -138,5 +175,5 @@ module.exports = {
     addParticipants,
     addCreatorAsParticipant,
     addAmount,
-    updateSplitBill
+    updateBill
 }

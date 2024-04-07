@@ -9,14 +9,14 @@ async function isRequestSent(sendersId,receiversId) {
         if (receiverInSentReq) {
             return [null, receiverInSentReq];
         }
-        var errObj = {
+        let errObj = {
             code: 404,
             message:'Bad Request'
         }
         return [errObj, null];
     } catch (err) {
         console.log(err);
-        var errObj = {
+        let errObj = {
             code: 500,
             message:'Something went wrong'
         }
@@ -26,7 +26,7 @@ async function isRequestSent(sendersId,receiversId) {
 
 }
 
-async function areFriends(sendersId,receiversId) {
+async function areTheyFriend(sendersId,receiversId) {
     try {
         if (!mongoose.Types.ObjectId.isValid(sendersId) || !mongoose.Types.ObjectId.isValid(receiversId)) {
             let errObj = {
@@ -35,20 +35,12 @@ async function areFriends(sendersId,receiversId) {
             }
             return [errObj, null];
         }
-        if (sendersId===receiversId){
-            const [error1, receiver] = await User.findById(receiversId);
-            if (error1) {
-                if (error1.code == 404) {
-                    return [error1.code, null];
-                }
-                if (error1.code == 500) {
-                    return [error1.code, null];
-                }
-            }
-            return [null, true];
-            
+
+        if (sendersId===receiversId){ 
+            return [null, true];   
         }
-        const sender = await User.findById(sendersId);
+
+        const sender = await User.findById(sendersId).populate('friends');
         if (!sender) {
             let errObj = {
                 code: 404,
@@ -57,8 +49,6 @@ async function areFriends(sendersId,receiversId) {
             return [errObj, false];
         }
         
-        await sender.populate('friends');
-
         const receiver = sender.friends.find(user => user._id.equals(receiversId));
         if (!receiver) {
             let errObj = {
@@ -66,14 +56,14 @@ async function areFriends(sendersId,receiversId) {
                 message:'User not found'
             }
             return [errObj, false];
+        } else {
+            return [null, true];
+            
         }
-
-        return [null, true];
-
 
     } catch (err) {
         console.log(err);
-        var errObj = {
+        let errObj = {
             code: 500,
             message:'Something Went Wrong in repo'
         }
@@ -88,7 +78,7 @@ async function findAllSentFriendReq(id) {
         return [null, friendReq];
     } catch (err) {
         console.log(err);
-        var errObj = {
+        let errObj = {
             code: 500,
             message:'Something went wrong'
         }
@@ -103,7 +93,7 @@ async function findAllReceivedFriendReq(id) {
         return [null, friendReq];
     } catch (err) {
         console.log(err);
-        var errObj = {
+        let errObj = {
             code: 500,
             message:'Something went wrong'
         }
@@ -121,7 +111,7 @@ async function findByIdAndUpdateRequestReceived(receiversId,sendersId) {
             {new:true}
         );
         if (!user) {
-            var errObj = {
+            let errObj = {
                 code: 404,
                 message:"User not found"
             }
@@ -133,7 +123,7 @@ async function findByIdAndUpdateRequestReceived(receiversId,sendersId) {
         
     } catch (err) {
         console.log(err);
-        var errObj = {
+        let errObj = {
             code: 500,
             message:'Something went wrong'
         }
@@ -150,7 +140,7 @@ async function findByIdAndUpdateRequestSent(sendersId,receiversId) {
             {new:true}
         );
         if (!user) {
-            var errObj = {
+            let errObj = {
                 code: 404,
                 message:"User not found"
             }
@@ -162,7 +152,7 @@ async function findByIdAndUpdateRequestSent(sendersId,receiversId) {
         
     } catch (err) {
         console.log(err);
-        var errObj = {
+        let errObj = {
             code: 500,
             message:'Something went wrong'
         }
@@ -174,7 +164,7 @@ async function findUserById(userId) {
     try {
         const user = await User.findById(userId);
         if (!user) {
-            var errObj = {
+            let errObj = {
                 code: 404,
                 message:"User not found"
             }
@@ -187,7 +177,7 @@ async function findUserById(userId) {
         }
     } catch (err) {
         console.log(err);
-        var errObj = {
+        let errObj = {
             code: 500,
             message: "Internal server error"
         };
@@ -199,7 +189,7 @@ async function  findUserByEmail(email)  {
     try {
         const user = await User.findOne({ email: email });
         if (!user) {
-            var errObj = {
+            let errObj = {
                 code: 404,
                 message:"User not found"
             }
@@ -210,7 +200,7 @@ async function  findUserByEmail(email)  {
     }
     catch (err) {
         console.log(err);
-        var errObj = {
+        let errObj = {
             code: 500,
             message: "Internal server error"
         };
@@ -225,6 +215,6 @@ module.exports = {
     findByIdAndUpdateRequestReceived,
     findAllReceivedFriendReq,
     findAllSentFriendReq,
-    areFriends,
+    areTheyFriend,
     isRequestSent
 }

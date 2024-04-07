@@ -26,6 +26,10 @@ const splitBillSchema = new mongoose.Schema({
   splitBillMethodology: {
     type: String,
     enum:['Custom','Equally']
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref:"User"
   }
 });
 
