@@ -1,13 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Edit2, Trash2, DollarSign, Calendar, X, Check } from 'lucide-react';
 
 const ExpenseManager = () => {
   const [expenses, setExpenses] = useState([]);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  
+  // Separate state for add and edit forms
+  const [addFormData, setAddFormData] = useState({
+    title: '',
+    amount: '',
+    date: '',
+    category: 'Food'
+  });
+  
+  const [editFormData, setEditFormData] = useState({
     title: '',
     amount: '',
     date: '',
@@ -19,14 +28,9 @@ const ExpenseManager = () => {
     'Healthcare', 'vacation', 'Shopping', 'Festivals'
   ];
 
-  // Backend API URL
-  const API_BASE = 'http://localhost:3000/api/expense';
+  const API_BASE = 'http://localhost:8000/api/expense';
 
-  // Fetch all expenses on component mount
-  useEffect(() => {
-    fetchExpenses();
-  }, [fetchExpenses]);
-
+  // Fetch expenses
   const fetchExpenses = useCallback(async () => {
     setLoading(true);
     try {
@@ -43,98 +47,86 @@ const ExpenseManager = () => {
     }
   }, []);
 
-  const handleInputChange = (e) => {
+  useEffect(() => {
+    fetchExpenses();
+  }, [fetchExpenses]);
+
+  // Add form handlers - STABLE REFERENCE
+  const handleAddFormChange = useCallback((e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
+    setAddFormData(prev => ({ ...prev, [name]: value }));
+  }, []);
 
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      amount: '',
-      date: '',
-      category: 'Food'
-    });
-  };
+  // Edit form handlers - STABLE REFERENCE
+  const handleEditFormChange = useCallback((e) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({ ...prev, [name]: value }));
+  }, []);
 
-  const addExpense = useCallback(async (e) => {
-    e.preventDefault();
-    if (!formData.title || !formData.amount || !formData.date) return;
+  // Add expense
+  const handleAddExpense = useCallback(async () => {
+    if (!addFormData.title || !addFormData.amount || !addFormData.date) return;
     
     setLoading(true);
-    
     try {
       const response = await fetch(`${API_BASE}/addexpense`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addFormData)
       });
       
       const data = await response.json();
-      
       if (data.code === 200 || data.success) {
-        fetchExpenses();
-        setIsAddModalOpen(false);
-        resetForm();
+        await fetchExpenses();
+        setShowAddModal(false);
+        setAddFormData({ title: '', amount: '', date: '', category: 'Food' });
       }
     } catch (error) {
       console.error('Error adding expense:', error);
     } finally {
       setLoading(false);
     }
-  }, [formData, resetForm, fetchExpenses]);
+  }, [addFormData, fetchExpenses]);
 
-  const updateExpense = useCallback(async (e) => {
-    e.preventDefault();
-    if (!formData.title || !formData.amount || !formData.date) return;
+  // Update expense
+  const handleUpdateExpense = useCallback(async () => {
+    if (!editFormData.title || !editFormData.amount || !editFormData.date || !editingExpense) return;
     
     setLoading(true);
-    
     try {
       const response = await fetch(`${API_BASE}/updateexpense/${editingExpense._id}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editFormData)
       });
       
       const data = await response.json();
-      
       if (data.code === 200 || data.success) {
-        fetchExpenses();
-        setIsEditModalOpen(false);
+        await fetchExpenses();
+        setShowEditModal(false);
         setEditingExpense(null);
-        resetForm();
+        setEditFormData({ title: '', amount: '', date: '', category: 'Food' });
       }
     } catch (error) {
       console.error('Error updating expense:', error);
     } finally {
       setLoading(false);
     }
-  }, [formData, editingExpense, resetForm, fetchExpenses]);
+  }, [editFormData, editingExpense, fetchExpenses]);
 
-  const deleteExpense = useCallback(async (expenseId) => {
-    if (!window.confirm('Are you sure you want to delete this expense?')) {
-      return;
-    }
+  // Delete expense
+  const handleDeleteExpense = useCallback(async (expenseId) => {
+    if (!window.confirm('Are you sure you want to delete this expense?')) return;
     
     setLoading(true);
-    
     try {
       const response = await fetch(`${API_BASE}/deleteexpense/${expenseId}`, {
         method: 'POST'
       });
       
       const data = await response.json();
-      
       if (data.code === 200 || data.success) {
-        fetchExpenses();
+        await fetchExpenses();
       }
     } catch (error) {
       console.error('Error deleting expense:', error);
@@ -143,29 +135,18 @@ const ExpenseManager = () => {
     }
   }, [fetchExpenses]);
 
-  const openEditModal = (expense) => {
+  const openEditModal = useCallback((expense) => {
     setEditingExpense(expense);
-    setFormData({
+    setEditFormData({
       title: expense.title,
       amount: expense.amount.toString(),
       date: expense.date,
       category: expense.category
     });
-    setIsEditModalOpen(true);
-  };
+    setShowEditModal(true);
+  }, []);
 
-  const closeModals = () => {
-    setIsAddModalOpen(false);
-    setIsEditModalOpen(false);
-    setEditingExpense(null);
-    resetForm();
-  };
-
-  const getTotalExpenses = () => {
-    return expenses.reduce((total, expense) => total + expense.amount, 0);
-  };
-
-  const getCategoryColor = useCallback((category) => {
+  const getCategoryColor = useMemo(() => {
     const colors = {
       Food: '#dcfce7',
       Transportation: '#dbeafe', 
@@ -176,373 +157,92 @@ const ExpenseManager = () => {
       Shopping: '#fce7f3',
       Festivals: '#fed7aa'
     };
-    return colors[category] || '#f3f4f6';
+    return (category) => colors[category] || '#f3f4f6';
   }, []);
 
-  const Modal = ({ isOpen, onClose, title, children }) => {
-    if (!isOpen) return null;
-
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          padding: '24px',
-          width: '100%',
-          maxWidth: '500px',
-          margin: '16px',
-          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.25)'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '16px'
-          }}>
-            <h2 style={{
-              fontSize: '20px',
-              fontWeight: '600',
-              color: '#1f2937',
-              margin: 0
-            }}>{title}</h2>
-            <button
-              onClick={onClose}
-              style={{
-                color: '#6b7280',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px'
-              }}
-            >
-              <X size={24} />
-            </button>
-          </div>
-          {children}
-        </div>
-      </div>
-    );
-  };
-
-  const inputStyle = useCallback(() => ({
-    width: '100%',
-    padding: '12px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    fontSize: '14px',
-    outline: 'none',
-    transition: 'border-color 0.2s',
-    fontFamily: 'inherit'
-  }), []);
-
-  const buttonStyle = useCallback(() => ({
-    padding: '12px 16px',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer',
-    border: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.2s'
-  }), []);
-
-  // Create a completely isolated ExpenseForm component
-  const ExpenseForm = useCallback(({ onSubmit, submitText }) => {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '4px'
-          }}>
-            Title
-          </label>
-          <input
-            type="text"
-            name="title"
-            value={formData.title}
-            onChange={handleInputChange}
-            style={inputStyle()}
-            placeholder="Enter expense title"
-            autoComplete="off"
-            key={`title-${formData.title}`}
-          />
-        </div>
-
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '4px'
-          }}>
-            Amount
-          </label>
-          <input
-            type="number"
-            name="amount"
-            value={formData.amount}
-            onChange={handleInputChange}
-            min="0"
-            step="0.01"
-            style={inputStyle()}
-            placeholder="0.00"
-            autoComplete="off"
-            key={`amount-${formData.amount}`}
-          />
-        </div>
-
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '4px'
-          }}>
-            Date
-          </label>
-          <input
-            type="date"
-            name="date"
-            value={formData.date}
-            onChange={handleInputChange}
-            style={inputStyle()}
-            autoComplete="off"
-            key={`date-${formData.date}`}
-          />
-        </div>
-
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#374151',
-            marginBottom: '4px'
-          }}>
-            Category
-          </label>
-          <select
-            name="category"
-            value={formData.category}
-            onChange={handleInputChange}
-            style={inputStyle()}
-            key={`category-${formData.category}`}
-          >
-            {categories.map(category => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', gap: '12px', paddingTop: '16px' }}>
-          <button
-            onClick={onSubmit}
-            disabled={loading || !formData.title || !formData.amount || !formData.date}
-            style={{
-              ...buttonStyle(),
-              flex: 1,
-              backgroundColor: '#2563eb',
-              color: 'white',
-              opacity: (loading || !formData.title || !formData.amount || !formData.date) ? 0.5 : 1
-            }}
-          >
-            <Check size={18} style={{ marginRight: '8px' }} />
-            {loading ? 'Saving...' : submitText}
-          </button>
-          <button
-            onClick={closeModals}
-            style={{
-              ...buttonStyle(),
-              flex: 1,
-              backgroundColor: '#d1d5db',
-              color: '#374151'
-            }}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }, [formData, handleInputChange, loading, closeModals, categories, inputStyle, buttonStyle]);
+  const totalExpenses = useMemo(() => {
+    return expenses.reduce((total, expense) => total + expense.amount, 0);
+  }, [expenses]);
 
   return (
-    <div style={{
-      maxWidth: '1024px',
-      margin: '0 auto',
-      padding: '24px',
-      backgroundColor: '#f9fafb',
-      minHeight: '100vh'
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-        padding: '24px',
-        marginBottom: '24px'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '24px'
-        }}>
+    <div className="max-w-4xl mx-auto p-6 bg-gray-50 min-h-screen">
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 style={{
-              fontSize: '24px',
-              fontWeight: 'bold',
-              color: '#1f2937',
-              margin: 0
-            }}>Expense Manager</h1>
-            <p style={{
-              color: '#6b7280',
-              marginTop: '4px',
-              margin: 0
-            }}>Track and manage your expenses</p>
+            <h1 className="text-2xl font-bold text-gray-900">Expense Manager</h1>
+            <p className="text-gray-600 mt-1">Track and manage your expenses</p>
           </div>
           <button
-            onClick={() => setIsAddModalOpen(true)}
-            style={{
-              ...buttonStyle(),
-              backgroundColor: '#2563eb',
-              color: 'white'
-            }}
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            <Plus size={20} style={{ marginRight: '8px' }} />
+            <Plus size={20} className="mr-2" />
             Add Expense
           </button>
         </div>
 
-        <div style={{
-          background: 'linear-gradient(to right, #3b82f6, #8b5cf6)',
-          color: 'white',
-          padding: '16px',
-          borderRadius: '8px',
-          marginBottom: '24px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <DollarSign size={24} style={{ marginRight: '12px' }} />
+        {/* Total */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-lg mb-6">
+          <div className="flex items-center">
+            {/* <span className="text-2xl mr-3">₹</span> */}
             <div>
-              <p style={{ fontSize: '14px', opacity: 0.9, margin: 0 }}>Total Expenses</p>
-              <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>
-                ${getTotalExpenses().toFixed(2)}
-              </p>
+              <p className="text-sm opacity-90">Total Expenses</p>
+              <p className="text-2xl font-bold">₹{totalExpenses.toFixed(2)}</p>
             </div>
           </div>
         </div>
 
+        {/* Expenses List */}
         {loading && expenses.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              border: '2px solid #2563eb',
-              borderTop: '2px solid transparent',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto'
-            }}></div>
-            <p style={{ color: '#6b7280', marginTop: '16px' }}>Loading expenses...</p>
+          <div className="text-center py-8">
+            <div className="w-12 h-12 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading expenses...</p>
           </div>
         ) : expenses.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '48px' }}>
-            <DollarSign size={48} style={{ color: '#9ca3af', margin: '0 auto 16px' }} />
-            <p style={{ color: '#6b7280', fontSize: '18px', margin: '0 0 8px 0' }}>No expenses found</p>
-            <p style={{ color: '#9ca3af', margin: 0 }}>Add your first expense to get started</p>
+          <div className="text-center py-12">
+            <span className="text-5xl text-gray-400 block mb-4">₹</span>
+            <p className="text-lg text-gray-600 mb-2">No expenses found</p>
+            <p className="text-gray-500">Add your first expense to get started</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="space-y-4">
             {expenses.map((expense) => (
-              <div
-                key={expense._id}
-                style={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                  transition: 'box-shadow 0.2s'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                      <h3 style={{
-                        fontSize: '18px',
-                        fontWeight: '600',
-                        color: '#1f2937',
-                        marginRight: '12px',
-                        margin: 0
-                      }}>
-                        {expense.title}
-                      </h3>
-                      <span style={{
-                        padding: '4px 8px',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        backgroundColor: getCategoryColor(expense.category),
-                        color: '#374151'
-                      }}>
+              <div key={expense._id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900 mr-3">{expense.title}</h3>
+                      <span 
+                        className="px-2 py-1 rounded-full text-xs font-medium text-gray-700"
+                        style={{ backgroundColor: getCategoryColor(expense.category) }}
+                      >
                         {expense.category}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#6b7280' }}>
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <DollarSign size={16} style={{ marginRight: '4px' }} />
-                        <span style={{ fontWeight: '500' }}>${expense.amount.toFixed(2)}</span>
+                    <div className="flex items-center gap-4 text-gray-600">
+                      <div className="flex items-center">
+                        {/* <span className="text-sm mr-1">₹</span> */}
+                        <span className="font-medium">₹{expense.amount.toFixed(2)}</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <Calendar size={16} style={{ marginRight: '4px' }} />
+                      <div className="flex items-center">
+                        <Calendar size={16} className="mr-1" />
                         <span>{new Date(expense.date).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '16px' }}>
+                  <div className="flex items-center gap-2 ml-4">
                     <button
                       onClick={() => openEditModal(expense)}
-                      style={{
-                        color: '#2563eb',
-                        background: 'none',
-                        border: 'none',
-                        padding: '8px',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded"
                       title="Edit expense"
                     >
                       <Edit2 size={18} />
                     </button>
                     <button
-                      onClick={() => deleteExpense(expense._id)}
-                      style={{
-                        color: '#dc2626',
-                        background: 'none',
-                        border: 'none',
-                        padding: '8px',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
+                      onClick={() => handleDeleteExpense(expense._id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded"
                       title="Delete expense"
                     >
                       <Trash2 size={18} />
@@ -555,28 +255,193 @@ const ExpenseManager = () => {
         )}
       </div>
 
-      <Modal
-        isOpen={isAddModalOpen}
-        onClose={closeModals}
-        title="Add New Expense"
-      >
-        <ExpenseForm onSubmit={addExpense} submitText="Add Expense" />
-      </Modal>
+      {/* Add Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Add New Expense</h2>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="p-1 text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <input
+                  key="add-title"
+                  type="text"
+                  name="title"
+                  value={addFormData.title}
+                  onChange={handleAddFormChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  placeholder="Enter expense title"
+                  autoComplete="off"
+                />
+              </div>
 
-      <Modal
-        isOpen={isEditModalOpen}
-        onClose={closeModals}
-        title="Edit Expense"
-      >
-        <ExpenseForm onSubmit={updateExpense} submitText="Update Expense" />
-      </Modal>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                <input
+                  key="add-amount"
+                  type="number"
+                  name="amount"
+                  value={addFormData.amount}
+                  onChange={handleAddFormChange}
+                  min="0"
+                  step="0.01"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  placeholder="0.00"
+                  autoComplete="off"
+                />
+              </div>
 
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <input
+                  key="add-date"
+                  type="date"
+                  name="date"
+                  value={addFormData.date}
+                  onChange={handleAddFormChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <select
+                  key="add-category"
+                  name="category"
+                  value={addFormData.category}
+                  onChange={handleAddFormChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                >
+                  {categories.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleAddExpense}
+                  disabled={loading || !addFormData.title || !addFormData.amount || !addFormData.date}
+                  className="flex-1 flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Check size={18} className="mr-2" />
+                  {loading ? 'Saving...' : 'Add Expense'}
+                </button>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 px-4 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Edit Expense</h2>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="p-1 text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <input
+                  key="edit-title"
+                  type="text"
+                  name="title"
+                  value={editFormData.title}
+                  onChange={handleEditFormChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  placeholder="Enter expense title"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                <input
+                  key="edit-amount"
+                  type="number"
+                  name="amount"
+                  value={editFormData.amount}
+                  onChange={handleEditFormChange}
+                  min="0"
+                  step="0.01"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  placeholder="0.00"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <input
+                  key="edit-date"
+                  type="date"
+                  name="date"
+                  value={editFormData.date}
+                  onChange={handleEditFormChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <select
+                  key="edit-category"
+                  name="category"
+                  value={editFormData.category}
+                  onChange={handleEditFormChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                >
+                  {categories.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleUpdateExpense}
+                  disabled={loading || !editFormData.title || !editFormData.amount || !editFormData.date}
+                  className="flex-1 flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Check size={18} className="mr-2" />
+                  {loading ? 'Saving...' : 'Update Expense'}
+                </button>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 px-4 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
